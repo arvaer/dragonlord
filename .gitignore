@@ -1,1 +1,7 @@
+.*
+!.gitignore
+
 /target
+debug/
+
+*/debug/*
