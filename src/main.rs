@@ -1,100 +1,59 @@
-#![allow(unused)]
-pub use self::error::{Error, Result};
-use crate::model::ModelController;
-use axum::Json;
-use axum::extract::Query;
-use axum::http::{Uri, Method};
-use axum::response::IntoResponse;
-use axum::routing::{get, get_service};
-use axum::{middleware, response::Response, Router};
-use ctx::Ctx;
-use serde::Deserialize;
-use serde_json::json;
-use uuid::Uuid;
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
-use tower_cookies::*;
-use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
-use tower_http::services::ServeDir;
-use axum::http::Request;
+#![allow(unused)] // For early development.
 
+// region:    --- Modules
+mod config;
+mod ctx;
 mod error;
+mod log;
 mod model;
 mod web;
-mod ctx;
-mod log;
 
-#[derive(Debug, Deserialize)]
-struct HelloParams {
-    name: Option<String>,
-}
+//#[cfg(test)]
+pub mod _dev_utils;
 
-fn routes_hello() -> Router {
-    Router::new().route("/hello", get(handler_hello))
-}
+pub use self::error::{Error, Result};
+pub use config::config; // enables use::crate::config
 
-fn routes_static() -> Router {
-    Router::new().nest_service("/", get_service(ServeDir::new("/")))
-}
+use crate::model::ModelManager;
+use crate::web::mw_auth::mw_ctx_resolve;
+use crate::web::mw_res_map::mw_reponse_map;
+use crate::web::{routes_login, routes_static};
+use axum::{middleware, Router};
+use tracing::info;
+use tracing_subscriber::EnvFilter;
+use std::net::SocketAddr;
+use tower_cookies::CookieManagerLayer;
+
+// endregion: --- Modules
 
 #[tokio::main]
-async fn main() -> Result<()>{
-    let mc = ModelController::new().await?;
-
-    let routes_apis = web::routes_tickets::routes(mc.clone()).route_layer(middleware::from_fn(web::mw_auth::mw_require_auth));
-
-    let all_routes = Router::new()
-        .merge(routes_hello())
-        .merge(web::routes_login::routes())
-        .nest("/api", routes_apis)
-        .layer(middleware::map_response(main_response_mapper))
-        .layer(middleware::from_fn_with_state(mc.clone(), web::mw_auth::ctx_resolver))
-        .layer(CookieManagerLayer::new())
-        .fallback_service(routes_static());
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("Listening on {}", addr);
-
-    let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
-    println!("->> LISTENING on {:?}\n", listener.local_addr());
-    axum::serve(listener, all_routes.into_make_service())
-        .await
-        .unwrap();
-    Ok(())
-}
-
-async fn main_response_mapper(ctx: Option<Ctx>, uri: Uri, req_method: Method, res: Response) -> Response {
-    println!("->> {:<12} - {res:?}", "RES_MAPPEr");
-    let uuid = Uuid::new_v4();
-
-    let service_error = res.extensions().get::<Error>();
-    let client_status_error = service_error.map(|e| e.client_status_and_error());
-    let error_response =
-        client_status_error
-        .as_ref()
-        .map(|(status_code, client_error)| {
-            let body = json!({
-                "error": {
-                    "type": client_error.as_ref(),
-                    "req_uuid": uuid.to_string(),
-                }
-            });
-            println!(" --> error_response - {body:?}",);
-            (*status_code, Json(body)).into_response()
-        });
+async fn main() -> Result<()> {
+	let mm = ModelManager::new().await?;
+    tracing_subscriber::fmt().with_target(false).with_env_filter(EnvFilter::from_default_env()).init();
+    _dev_utils::init_dev().await;
 
 
-    println!("->> {:<12} - {error_response:?}", "RES_MAPPER_ERROR");
-    // server log
-    log::log_request(uuid, uri, req_method, ctx, client_status_error.unzip().1, service_error).await;
-    println!();
+	// -- Define Routes
+	// let routes_rpc = rpc::routes(mm.clone())
+	//   .route_layer(middleware::from_fn(mw_ctx_require));
 
-    error_response.unwrap_or(res)
+	let routes_all = Router::new()
+		.merge(routes_login::routes())
+		// .nest("/api", routes_rpc)
+		.layer(middleware::map_response(mw_reponse_map))
+		.layer(middleware::from_fn_with_state(mm.clone(), mw_ctx_resolve))
+		.layer(CookieManagerLayer::new())
+		.fallback_service(routes_static::serve_dir());
 
-}
+	// region:    --- Start Server
+	let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    info!("{:?} - {addr}\n", "LISTENING");
 
-async fn handler_hello(Query(params): Query<HelloParams>) -> impl IntoResponse {
-    println!("handler_hello - {params:?}");
-    let name = params.name.as_deref().unwrap_or("World");
-    return format!("Hello, {}!", name);
+	axum::Server::bind(&addr)
+		.serve(routes_all.into_make_service())
+		.await
+		.unwrap();
+	// endregion: --- Start Server
+
+	Ok(())
 }
