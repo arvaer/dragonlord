@@ -1,9 +1,12 @@
 use crate::ctx::Ctx;
 use crate::model::ModelManager;
 use crate::model::{Error, Result};
+use crate::model::base::{DbBMC, create, update, get, list, delete};
 
 use serde::{Deserialize, Serialize};
+use sqlb::Fields;
 use sqlx::FromRow;
+
 
 // region: Task Types
 #[derive(Debug, Clone, FromRow, Serialize)]
@@ -12,12 +15,12 @@ pub struct Task {
     pub title: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Fields, Deserialize)]
 pub struct TaskForCreate {
     pub title: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Fields, Deserialize)]
 pub struct TaskForUpdate {
     pub title: Option<String>,
 }
@@ -26,49 +29,31 @@ pub struct TaskForUpdate {
 //region: TaskBMC
 pub struct TaskBMC;
 
+impl DbBMC for TaskBMC{
+    const TABLE: &'static str = "task";
+}
+
 impl TaskBMC {
-    pub async fn create(_ctx: &Ctx, mm: &ModelManager, task_c: TaskForCreate) -> Result<i64> {
-        let db = mm.db();
-        let (id,) =
-            sqlx::query_as::<_, (i64,)>("INSERT INTO task (title) values ($1) returning id")
-                .bind(task_c.title)
-                .fetch_one(db)
-                .await?;
-
-        Ok(id)
+    pub async fn create(ctx: &Ctx, mm: &ModelManager, task_c: TaskForCreate) -> Result<i64> {
+        create::<TaskBMC, TaskForCreate>(ctx, mm, task_c).await
     }
 
-    pub async fn get(_ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<Task> {
-        let db = mm.db();
-        let task: Task = sqlx::query_as("SELECT * from task where id = $1")
-            .bind(id)
-            .fetch_optional(db)
-            .await?
-            .ok_or(Error::EntityNotFound { entity: "task", id })?;
-
-        return Ok(task);
+    pub async fn get(ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<Task> {
+        get::<TaskBMC, Task>(ctx, mm, id).await
     }
 
-    pub async fn delete(_ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<()> {
-        let db = mm.db();
-        let count = sqlx::query("DELETE from task where id = $1")
-            .bind(id)
-            .execute(db)
-            .await?
-            .rows_affected();
-        if count == 0 {
-            return Err(Error::EntityNotFound { entity: "task", id });
-        }
-
-        return Ok(());
+    pub async fn list(ctx: &Ctx, mm: &ModelManager) -> Result<Vec<Task>> {
+        list::<TaskBMC, Task>(ctx, mm).await
     }
 
-    pub async fn list(_ctx: &Ctx, mm: &ModelManager) -> Result<Vec<Task>> {
-        let db = mm.db();
-        let tasks: Vec<Task> = sqlx::query_as("SELECT * from task").fetch_all(db).await?;
-
-        return Ok(tasks);
+    pub async fn update(ctx: &Ctx, mm: &ModelManager, id: i64, task_u: TaskForUpdate) -> Result<()> {
+        update::<TaskBMC, TaskForUpdate>(ctx, mm, id, task_u).await
     }
+
+    pub async fn delete(ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<()> {
+        delete::<TaskBMC>(ctx, mm, id).await
+    }
+
 }
 //endregion: TaskBMC
 
@@ -130,14 +115,67 @@ mod tests {
 
     #[serial]
     #[tokio::test]
+    async fn test_update_ok() -> Result<()> {
+        //setup
+        let mm = crate::_dev_utils::init_test().await;
+        let ctx = Ctx::root_ctx();
+        let fx_title = "test_update_ok title";
+        let fx_title_updated = "test_update_ok title updated";
+
+        // Exec
+        let task_c: TaskForCreate = TaskForCreate { title: String::from(fx_title) };
+        let task_u: TaskForUpdate = TaskForUpdate { title: Some(String::from(fx_title_updated)) };
+
+        let id = TaskBMC::create(&ctx, &mm, task_c).await?;
+        //println!("TASK CREATED {}", id);
+        //println!("TASK FROM BE TITLE: {}", TaskBMC::get(&ctx, &mm, id).await?.title);
+        TaskBMC::update(&ctx, &mm, id, task_u).await?;
+        //println!("TASK JUST UPDATED: {}", id);
+        //println!("TASK FROM BE TITLE: {}", TaskBMC::get(&ctx, &mm, id).await?.title);
+
+        //Check
+        assert_eq!(TaskBMC::get(&ctx, &mm, id).await?.title, fx_title_updated);
+
+        //cleanup
+        TaskBMC::delete(&ctx, &mm, id).await?;
+        Ok(())
+
+    }
+
+
+    #[serial]
+    #[tokio::test]
     async fn test_get_err_not_found() -> Result<()> {
         //setup
         let mm = crate::_dev_utils::init_test().await;
         let ctx = Ctx::root_ctx();
-        let fx_id = 100 as i64;
+        let fx_id = 100_i64;
 
         //Exec
         let res = TaskBMC::get(&ctx, &mm, fx_id).await;
+
+        //check
+        assert!(matches!(
+            res,
+            Err(Error::EntityNotFound {
+                entity: "task",
+                id: 100
+            })
+        ));
+        Ok(())
+    }
+
+    #[serial]
+    #[tokio::test]
+    async fn test_update_err_not_found() -> Result<()> {
+        //setup
+        let mm = crate::_dev_utils::init_test().await;
+        let ctx = Ctx::root_ctx();
+        let fx_id = 100_i64;
+        let task_u = TaskForUpdate { title: Some("test_update_err_not_found title".to_string()) };
+
+        //Exec
+        let res = TaskBMC::update(&ctx, &mm, fx_id, task_u).await;
 
         //check
         assert!(matches!(

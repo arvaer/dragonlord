@@ -22,6 +22,7 @@ tower-http = { version = "0.4", features = ["fs"] }
 tower-cookies = "0.9"
 # -- Data
 sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "postgres", "uuid", "time"] }
+sqlb = "0.3.0"
 # -- Others
 uuid = {version = "1", features = ["v4","fast-rng",]}
 lazy-regex = "3"
