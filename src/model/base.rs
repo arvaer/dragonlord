@@ -5,22 +5,14 @@ use sqlb::HasFields;
 use sqlx::postgres::PgRow;
 use sqlx::FromRow;
 
-
-use super::task::Task;
-
 pub trait DbBMC {
     const TABLE: &'static str;
 }
 
-
-
-
-
-
 pub async fn create<MC, E>(_ctx: &Ctx, mm: &ModelManager, data: E) -> Result<i64>
 where
-    MC:DbBMC,
-    E: HasFields
+    MC: DbBMC,
+    E: HasFields,
 {
     let db = mm.db();
 
@@ -33,7 +25,6 @@ where
         .await?;
 
     Ok(id)
-
 }
 
 pub async fn get<MC, Entity>(_ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<Entity>
@@ -72,7 +63,6 @@ where
     Ok(entity)
 }
 
-
 pub async fn update<MC, E>(_ctx: &Ctx, mm: &ModelManager, id: i64, data: E) -> Result<()>
 where
     MC: DbBMC,
@@ -88,29 +78,32 @@ where
         .exec(db)
         .await?;
     if count == 0 {
-        return Err(Error::EntityNotFound { entity: MC::TABLE, id });
+        return Err(Error::EntityNotFound {
+            entity: MC::TABLE,
+            id,
+        });
     }
 
     Ok(())
 }
 
-
 pub async fn delete<MC>(_ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<()>
 where
     MC: DbBMC,
 {
-        let db = mm.db();
-        let count = sqlb::delete()
-            .table(MC::TABLE)
-            .and_where("id", "=", id)
-            .exec(db)
-            .await?;
+    let db = mm.db();
+    let count = sqlb::delete()
+        .table(MC::TABLE)
+        .and_where("id", "=", id)
+        .exec(db)
+        .await?;
 
-        if count == 0 {
-            return Err(Error::EntityNotFound { entity: MC::TABLE, id });
-        }
+    if count == 0 {
+        return Err(Error::EntityNotFound {
+            entity: MC::TABLE,
+            id,
+        });
+    }
 
-        Ok(())
+    Ok(())
 }
-
-

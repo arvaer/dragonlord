@@ -3,6 +3,7 @@
 mod base;
 mod error;
 mod store;
+mod user;
 pub mod task; // <- this is going to be our task model controller
 
 pub use self::error::{Error, Result};

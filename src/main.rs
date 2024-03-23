@@ -8,6 +8,7 @@ mod error;
 mod log;
 mod model;
 mod web;
+mod crypt;
 
 //#[cfg(test)]
 pub mod _dev_utils;
