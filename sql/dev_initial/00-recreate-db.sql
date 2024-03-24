@@ -5,5 +5,5 @@ DROP DATABASE IF EXISTS app_db;
 DROP USER IF EXISTS app_user;
 
 -- DEV ONLY - Dev only password (for local dev and unit test).
-CREATE USER app_user PASSWORD 'dev_only_pwd';
+CREATE USER app_user PASSWORD 'DRAGONLORD';
 CREATE DATABASE app_db owner app_user ENCODING = 'UTF-8';

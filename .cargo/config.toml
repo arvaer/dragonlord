@@ -2,10 +2,10 @@
 RUST_LOG="dragonlord=debug"
 
 ## - Secres
-SERVICE_DB_URL="postgres://app_user:dev_only_pwd@localhost/app_db"
+SERVICE_DB_URL="postgres://app_user:DRAGONLORD@localhost/app_db"
 SERVICE_PWD_KEY="3MkLhfGylixuC7sSYRZkYAD8kg2aTkIyZqKm0xs86Edx1NliC9cPYvhgCLPpC0j-zwEEEK50CvQmvlVS1kRvzg"
 SERVICE_TOKEN_KEY="fszW7mpq6m_fHPf0C_-I7Nqd16VI_UnqsAMmqK1ajICcmFuln9TH4SsZNz_KqyxSGjGTXdk3epIzS1n9bsQL3A"
-SERVICE_TOKEN_DURATION="1800"
+SERVICE_TOKEN_DURATION_SEC="1800"
 
 # Config
 WEB_FOLDER="web-folder"

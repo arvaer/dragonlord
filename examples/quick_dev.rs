@@ -1,28 +1,32 @@
-#![allow(unused)]
+#![allow(unused)] // For beginning only.
 
 use anyhow::Result;
 use serde_json::json;
-use httpc_test::*;
 
-#[tokio::test]
-async fn quick_dev() -> Result<()> {
-    let hc = httpc_test::new_client("http://localhost:8080")?;
+#[tokio::main]
+async fn main() -> Result<()> {
+	let hc = httpc_test::new_client("http://localhost:8080")?;
 
-    hc.do_get("/index.html").await?.print().await?;
+	// hc.do_get("/index.html").await?.print().await?;
 
-    let req_login = hc.do_post("/api/login", {
-        json!({
-            "username": "admin",
-            "pwd": "admin"
-        })
-    });
+	let req_login = hc.do_post(
+		"/api/login",
+		json!({
+			"username": "demo1",
+			"pwd": "welcome2"
+		}),
+	);
+	req_login.await?.print().await?;
 
-   req_login.await?.print().await?;
+	let req_logoff = hc.do_post(
+		"/api/logoff",
+		json!({
+			"logoff": true
+		}),
+	);
+	// req_logoff.await?.print().await?;
 
+	//hc.do_get("/hello").await?.print().await?;
 
-
-    Ok(())
-
+	Ok(())
 }
-
-
