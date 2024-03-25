@@ -1,3 +1,4 @@
+use crate::crypt;
 use crate::model;
 use crate::web;
 use axum::http::StatusCode;
@@ -15,11 +16,13 @@ pub enum Error {
     LoginFailUsernameNotFound,
     LoginFailNoPassword { user_id: i64 },
     LoginFailPasswordMismatch { user_id: i64 },
+    LogoutFail,
     // -- CtxExtError
     CtxExt(web::mw_auth::CtxExtError),
 
     // Modules
     Model(model::Error),
+    Crypt(crypt::Error),
 }
 
 // region:    --- Axum IntoResponse
@@ -48,6 +51,12 @@ impl core::fmt::Display for Error {
 impl From<model::Error> for Error {
     fn from(val: model::Error) -> Self {
         Self::Model(val)
+    }
+}
+
+impl From<crypt::Error> for Error {
+    fn from(val: crypt::Error) -> Self{
+        Self::Crypt(val)
     }
 }
 
