@@ -15,7 +15,7 @@ pub struct Task {
     pub title: String,
 }
 
-#[derive(Fields, Deserialize)]
+#[derive(Fields, Deserialize, Debug)]
 pub struct TaskForCreate {
     pub title: String,
 }

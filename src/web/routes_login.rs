@@ -67,7 +67,6 @@ async fn api_logout_handler(
     debug!("{:<12} - api_login_handler", "HANDLER");
     let LogoutPayload { logoff } = payload;
     if logoff {
-
         web::remove_token_cookie(&cookies);
 
         let body = Json(json!({
@@ -75,8 +74,7 @@ async fn api_logout_handler(
         }));
 
         Ok(body)
-    }
-    else {
+    } else {
         Err(Error::LogoutFail)
     }
 }

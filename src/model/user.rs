@@ -45,6 +45,9 @@ pub struct UserForAuth {
     pub token_salt: Uuid,
 }
 
+
+
+
 // end types
 // trait
 pub trait UserBy: HasFields + for<'r> FromRow<'r, PgRow> + Unpin + Send {}

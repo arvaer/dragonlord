@@ -1,10 +1,10 @@
 use crate::ctx::Ctx;
 use crate::log::log_request;
-use crate::web;
+use crate::web::{self, rpc};
 use axum::http::{Method, Uri};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use serde_json::json;
+use serde_json::{json, to_value};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -19,16 +19,25 @@ pub async fn mw_reponse_map(
 
     // -- Get the eventual response error.
     let web_error = res.extensions().get::<web::Error>();
+    let rpc_info = res.extensions().get::<rpc::RpcInfo>();
     let client_status_error = web_error.map(|se| se.client_status_and_error());
 
     // -- If client error, build the new reponse.
     let error_response = client_status_error
         .as_ref()
         .map(|(status_code, client_error)| {
+            let client_error = to_value(client_error).ok();
+            let message = client_error.as_ref().and_then(|v| v.get("message"));
+            let detail = client_error.as_ref().and_then(|v| v.get("detail"));
+
             let client_error_body = json!({
                 "error": {
-                    "type": client_error.as_ref(),
-                    "req_uuid": uuid.to_string(),
+                    "rpc_id":rpc_info.as_ref().map(|rpc| rpc.id.clone()),
+                    "message" : message,
+                    "data" : {
+                        "req_uuid": uuid.to_string(),
+                        "detail": detail
+                    }
                 }
             });
 
@@ -41,7 +50,7 @@ pub async fn mw_reponse_map(
     // -- Build and log the server log line.
     let client_error = client_status_error.unzip().1;
     // TODO: Need to hander if log_request fail (but should not fail request)
-    let _ = log_request(uuid, req_method, uri, ctx, web_error, client_error).await;
+    let _ = log_request(uuid, req_method, rpc_info, uri, ctx, web_error, client_error).await;
 
     debug!("\n");
 

@@ -19,10 +19,19 @@ pub enum Error {
     LogoutFail,
     // -- CtxExtError
     CtxExt(web::mw_auth::CtxExtError),
-
+    // -- RPC
+    RpcMethodUnknown(String),
+    RpcMissingParams {
+        rpc_method: String
+    },
+    RpcFailToInterpret{
+        rpc_method: String
+    },
     // Modules
     Model(model::Error),
     Crypt(crypt::Error),
+    // Extern Modules
+    Serde(String)
 }
 
 // region:    --- Axum IntoResponse
@@ -59,6 +68,11 @@ impl From<crypt::Error> for Error {
         Self::Crypt(val)
     }
 }
+ impl From<serde_json::Error> for Error {
+     fn from(val: serde_json::Error) -> Self{
+         Self::Serde(val.to_string())
+     }
+ }
 
 impl std::error::Error for Error {}
 // endregion: --- Error Boilerplate
@@ -83,6 +97,12 @@ impl Error {
             // --Auth
             CtxExt(_) => (StatusCode::FORBIDDEN, ClientError::NO_AUTH),
 
+            // --Model
+            Model(model::Error::EntityNotFound { entity, id}) => (
+                StatusCode::BAD_REQUEST,
+                ClientError::ENTITY_NOT_FOUND{ entity, id: *id }
+            ),
+
             // -- Fallback.
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -92,11 +112,13 @@ impl Error {
     }
 }
 
-#[derive(Debug, strum_macros::AsRefStr)]
+#[derive(Debug, Serialize, strum_macros::AsRefStr)]
+#[serde(tag="message", content="detail")]
 #[allow(non_camel_case_types)]
 pub enum ClientError {
     LOGIN_FAIL,
     NO_AUTH,
     SERVICE_ERROR,
+    ENTITY_NOT_FOUND { entity: &'static str, id: i64}
 }
 // endregion: --- Client Error

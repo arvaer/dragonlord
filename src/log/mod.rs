@@ -1,4 +1,5 @@
 use crate::ctx::Ctx;
+use crate::web::rpc::RpcInfo;
 use crate::web::{self, ClientError};
 use crate::Result;
 use axum::http::{Method, Uri};
@@ -12,6 +13,7 @@ use uuid::Uuid;
 pub async fn log_request(
 	uuid: Uuid,
 	req_method: Method,
+    rpc_info: Option<&RpcInfo>,
 	uri: Uri,
 	ctx: Option<Ctx>,
 	web_error: Option<&web::Error>,
@@ -41,6 +43,9 @@ pub async fn log_request(
 
 		error_type,
 		error_data,
+
+        rpc_id: rpc_info.and_then(|i| i.id.as_ref().map(|i| i.to_string())),
+        rpc_method: rpc_info.map(|rpc| rpc.method.to_string())
 	};
 
 	debug!("REQUEST LOG LINE:\n{}", json!(log_line));
@@ -67,4 +72,8 @@ struct RequestLogLine {
 	client_error_type: Option<String>,
 	error_type: Option<String>,
 	error_data: Option<Value>,
+
+    // -- rpc info
+    rpc_id : Option<String>,
+    rpc_method: Option<String>
 }
